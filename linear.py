@@ -160,10 +160,10 @@ if __name__ == "__main__":
     solver = Solver()
     input_shape = ConvexPolygon(
         [
-            [-5, -5],
-            [5, -5],
-            [5, 5],
-            [-5, 5]
+            [-1, -1],
+            [1, -1],
+            [1, 1],
+            [-1, 1]
         ]
     )
     x = Real('x')
