@@ -17,5 +17,9 @@ if __name__ == "__main__":
     # add circle constraints on output
     constraints.append(out_vars[0]**2 + out_vars[1]**2 > 1)
     # this SHOULD give no solution in a proper thing
+    
+    print(len(constraints))
+        
+    z3.set_param("parallel.enable", "true");
     z3.solve(constraints)
 
