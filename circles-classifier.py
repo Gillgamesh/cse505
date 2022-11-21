@@ -11,12 +11,10 @@ import torch.nn as nn
 
 print("Using PyTorch Version %s" %torch.__version__)
 
-np.random.seed(1)
+np.random.seed(6)
 torch.manual_seed(0)
 
-# Change noise to 0.6 for ~one incorrect point
-# Change factor to 0.8 for ~two incorrect points
-X, Y = make_circles(500, noise=0.05, factor=0.7)
+X, Y = make_circles(1000, noise=0.06, factor=0.6)
 
 
 # Split into test and training data
@@ -35,18 +33,14 @@ plt.title('Circle Data')
 # Define network dimensions
 n_input_dim = X_train.shape[1]
 # Layer size
-n_hidden = 6 # Number of hidden nodes
-n_output = 1 # Number of output nodes = for binary classifier
+n_hidden = 4 # Number of hidden nodes
+n_output = 1 # Number of output nodes. Use "1" for binary classifier
 
 # Build your network
 net = nn.Sequential(
-    nn.Linear(n_input_dim, 32),
+    nn.Linear(n_input_dim, n_hidden),
     nn.ReLU(),
-    nn.Linear(32, 32),
-    nn.ReLU(),
-    nn.Linear(32, 16),
-    nn.ReLU(),
-    nn.Linear(16, 1),
+    nn.Linear(n_hidden, n_output),
     nn.ReLU())
 
 print(net)
@@ -58,13 +52,13 @@ print(net)
 
 ## Training?
 loss_func = nn.L1Loss()
-learning_rate = 0.01
+learning_rate = 0.003
 optimizer = torch.optim.Adam(net.parameters(), lr=learning_rate)
 
 
 train_loss = []
 train_accuracy = []
-iters = 100
+iters = 500
 Y_train_t = torch.FloatTensor(Y_train).reshape(-1, 1)
 for i in range(iters):
     X_train_t = torch.FloatTensor(X_train)
