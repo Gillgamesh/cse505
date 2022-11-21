@@ -122,7 +122,25 @@ class NonlinearNoApproxExample(manim.Scene):
             # manim.Vector([1,1]),
             # manim.Vector([-1,1]),
         )
-        violation_vector = manim.Vector([1, -3/10], color=manim.utils.color.PINK)
+        # violation_vector = manim.Vector([1, -3/10], color=manim.utils.color.PINK)
+        violation_vector = manim.Vector(
+            [
+                371963208783575395187310035015569601033584203264975312962538608940864192835634050736150645301754565570 /
+                375887829275949276828963180752582952524793046740097912556650658071049565356526290125072559512401061289
+                - 374325127806784564487629454220896202857217154943793422826257779076591962585076227602096877692486666753 /
+                375887829275949276828963180752582952524793046740097912556650658071049565356526290125072559512401061289,
+            ],
+            color=manim.utils.color.PINK
+        )
+        violation_vector2 = manim.Vector(
+            [
+                371963208783575395187310035015569601033584203264975312962538608940864192835634050736150645301754565570 /
+                375887829275949276828963180752582952524793046740097912556650658071049565356526290125072559512401061289,
+                -374325127806784564487629454220896202857217154943793422826257779076591962585076227602096877692486666753 /
+                375887829275949276828963180752582952524793046740097912556650658071049565356526290125072559512401061289
+            ],
+            color=manim.utils.color.RED
+        )
         # input_square = manim.Square()
         input_grid = manim.NumberPlane(
             x_length=2,
@@ -157,6 +175,7 @@ class NonlinearNoApproxExample(manim.Scene):
             manim.ApplyPointwiseFunction(weird_polar, input_grid),
             manim.ApplyPointwiseFunction(run_model, input_grid2 ),
             manim.ApplyPointwiseFunction(weird_polar, violation_vector),
+            manim.ApplyPointwiseFunction(run_model, violation_vector2),
         )
         
         # self.play(
