@@ -113,7 +113,7 @@ def train_model(X, y, num_epochs=20):
         print(f"epoch {epoch}: loss {loss}" )
     return layers
 
-class NonlinearNoApproxExample(manim.Scene):
+class NonlinearNoApproxExample(manim.ZoomedScene):
     def construct(self):
         self.add(
             manim.NumberPlane(),
@@ -123,22 +123,20 @@ class NonlinearNoApproxExample(manim.Scene):
             # manim.Vector([-1,1]),
         )
         # violation_vector = manim.Vector([1, -3/10], color=manim.utils.color.PINK)
+        # TODO - get this programatically
+        violation_coords = [
+            375404693077277226889351051194570845062176041542286876927382358940864192835634050736150645301754565570 /
+            375887829275949276828963180752582952524793046740097912556650658071049565356526290125072559512401061289,
+            -375880577512710485513406111182162340662741698738972977513757779076591962585076227602096877692486666753 /
+            375887829275949276828963180752582952524793046740097912556650658071049565356526290125072559512401061289,
+            0
+        ]
         violation_vector = manim.Vector(
-            [
-                371963208783575395187310035015569601033584203264975312962538608940864192835634050736150645301754565570 /
-                375887829275949276828963180752582952524793046740097912556650658071049565356526290125072559512401061289
-                - 374325127806784564487629454220896202857217154943793422826257779076591962585076227602096877692486666753 /
-                375887829275949276828963180752582952524793046740097912556650658071049565356526290125072559512401061289,
-            ],
+            violation_coords,
             color=manim.utils.color.PINK
         )
         violation_vector2 = manim.Vector(
-            [
-                371963208783575395187310035015569601033584203264975312962538608940864192835634050736150645301754565570 /
-                375887829275949276828963180752582952524793046740097912556650658071049565356526290125072559512401061289,
-                -374325127806784564487629454220896202857217154943793422826257779076591962585076227602096877692486666753 /
-                375887829275949276828963180752582952524793046740097912556650658071049565356526290125072559512401061289
-            ],
+            violation_coords,
             color=manim.utils.color.RED
         )
         # input_square = manim.Square()
@@ -165,6 +163,7 @@ class NonlinearNoApproxExample(manim.Scene):
         #     # manim.ApplyMatrix(matrix, manim.Vector([0,1]))
         #     )
         input_grid.prepare_for_nonlinear_transform()
+        input_grid2.prepare_for_nonlinear_transform()
         model = BasicSequentialModel()
         model.load_state_dict(torch.load("network.tm"))
         def run_model(points):
@@ -177,6 +176,10 @@ class NonlinearNoApproxExample(manim.Scene):
             manim.ApplyPointwiseFunction(weird_polar, violation_vector),
             manim.ApplyPointwiseFunction(run_model, violation_vector2),
         )
+        # wait and zoom in
+        self.wait()
+        # self.play(self.camera.frame.animate.move_to(run_model(violation_coords)).set(width=(0.01)))
+        self.wait(1)
         
         # self.play(
         #     manim.Apply(matrix, input_square)
