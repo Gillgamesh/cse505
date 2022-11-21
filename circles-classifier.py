@@ -1,6 +1,6 @@
 # https://www.datahubbs.com/deep-learning-101-first-neural-network-with-pytorch/
 
-# This example clusters moon data into two classes.
+# This example clusters points in concentric circles into two classes.
 
 import numpy as np
 from sklearn.datasets import make_circles
@@ -38,9 +38,9 @@ n_output = 1 # Number of output nodes = for binary classifier
 # Build your network
 net = nn.Sequential(
     nn.Linear(n_input_dim, n_hidden),
-    nn.ELU(),
+    nn.ReLU(),
     nn.Linear(n_hidden, n_output),
-    nn.Sigmoid())
+    nn.ReLU())
 
 print(net)
 
@@ -50,7 +50,7 @@ print(net)
 
 
 ## Training?
-loss_func = nn.BCELoss()
+loss_func = nn.L1Loss()
 learning_rate = 0.01
 optimizer = torch.optim.Adam(net.parameters(), lr=learning_rate)
 
