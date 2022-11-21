@@ -130,6 +130,14 @@ class ConstrainedClassifier:
         if pause_for_plot:
             plt.show()
 
+    def classify_coordinate(self, coords):
+        coords_array = np.ndarray(shape=(1,2), dtype=float, buffer=np.array(coords))
+        coords_input_tensor = torch.FloatTensor(coords_array)
+        coords_output_tensor = self.net(coords_input_tensor)
+        coords_output_class = np.where(coords_output_tensor.detach().numpy()<0.5, 0, 1)
+        print("NN classification: ({}, {}) is classified as {}.".format(coords[0], coords[1], coords_output_class[0][0]))
+        return coords_output_class
+
 
 def main():
     print("Using PyTorch Version %s" %torch.__version__)
@@ -149,15 +157,15 @@ def main():
     cc.plot_training(pause_for_plot=False)
 
     cc.assess_net()
-    cc.plot_barrier(pause_for_plot=False)
+    cc.plot_barrier(pause_for_plot=True)
 
 
 
     ## Z3
 
-    constraints, in_vars, out_vars = lantern.as_z3(cc.net)
-    print("Z3 constraints, input variables, output variables (Real-sorted):")
-    #print(constraints)
+    nn_constraints, in_vars, out_vars = lantern.as_z3(cc.net)
+    print("Z3: NN constraints, input variables, output variables (Real-sorted):")
+    #print(nn_constraints)
     print("Inputs:", in_vars)
     print("Outputs:", out_vars)
 
@@ -175,10 +183,19 @@ def main():
             out_class == 0,
     )
 
-    counterexample_constraint = Or(inner_point_classified_as_outer)
+    # If a point in the in outer ring is classified as being in the inner ring,
+    # then we have found a counterexample.
+    outer_point_classified_as_inner = And(
+            # Define point outside inner donut: 0.75 <= radius
+            (in_pt_x * in_pt_x) + (in_pt_y * in_pt_y) >= 0.5625, # radius >= 0.75
+            # Outer point classified in inner donut.
+            out_class == 1,
+    )
+
+    counterexample_constraint = Or(inner_point_classified_as_outer, outer_point_classified_as_inner)
 
     s = Solver()
-    s.add(constraints)
+    s.add(nn_constraints)
     s.add(counterexample_constraint)
     sat_check = s.check()
     if sat_check == sat:
@@ -196,16 +213,11 @@ def main():
         counterexample_class = relu3_out_0_interp
 
         print("Z3 counterexample: ({}, {}) -> {}".format(counterexample_coords[0], counterexample_coords[1], counterexample_class))
-
-        # Confirm that the counter-example is indeed mapped to the wrong class.
-        counterexample_array = np.ndarray(shape=(1,2), dtype=float, buffer=np.array(counterexample_coords))
-        counterexample_input_tensor = torch.FloatTensor(counterexample_array)
-        counterexample_output_tensor = cc.net(counterexample_input_tensor)
-        counterexample_output_class = np.where(counterexample_output_tensor.detach().numpy()<0.5, 0, 1)
-        print("({}, {}) is classified as {}.".format(counterexample_coords[0], counterexample_coords[1], counterexample_output_class[0][0]))
+        cc.classify_coordinate(counterexample_coords)
 
     else:
         print("Hooray! Failed to find a counterexample.")
+        cc.classify_coordinate([0.9, -0.1])
 
 if __name__ == '__main__':
     main()
