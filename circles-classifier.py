@@ -1,6 +1,7 @@
-# https://www.datahubbs.com/deep-learning-101-first-neural-network-with-pytorch/
-
 # This example clusters points in concentric circles into two classes.
+#
+# https://www.datahubbs.com/deep-learning-101-first-neural-network-with-pytorch/
+# https://medium.com/mlearning-ai/how-to-create-two-circles-in-sklearn-and-make-predictions-on-it-691a94e64f81
 
 import numpy as np
 from sklearn.datasets import make_circles
@@ -8,6 +9,11 @@ from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
+import pandas
+
+import z3
+from z3 import *
+import lantern
 
 print("Using PyTorch Version %s" %torch.__version__)
 
@@ -22,11 +28,14 @@ X_train, X_test, Y_train, Y_test = train_test_split(X, Y,
     test_size=0.25, random_state=73)
 
 # Plot
-plt.figure(figsize=(12,8))
-plt.scatter(X_train[:,0], X_train[:,1], c=Y_train)
+df = pandas.DataFrame(dict(x=X[:,0], y=X[:,1], label=Y))
+colors = {0: 'red', 1: 'blue'}
+fig, ax = plt.subplots(figsize=(12,8))
+grouped = df.groupby('label')
+for key, group in grouped:
+    group.plot(ax=ax, kind='scatter', x='x', y='y', label=key, color=colors[key])
 plt.title('Circle Data')
 #plt.show()
-
 
 #### Build the neural network
 
@@ -45,9 +54,6 @@ net = nn.Sequential(
 
 print(net)
 
-
-
-## TODO: Do we need the net(x) steps here?
 
 
 ## Training?
@@ -83,10 +89,6 @@ ax[1].set_title('Training Accuracy')
 
 plt.tight_layout()
 #plt.show()
-
-
-
-
 
 ## Plot our network's partitioning barrier
 
@@ -126,3 +128,54 @@ plt.contourf(XX, YY, Z, cmap=plt.cm.Accent, alpha=0.5)
 plt.scatter(X_test[:,0], X_test[:,1], c=Y_test,
             cmap=plt.cm.Accent)
 plt.show()
+
+
+## Z3
+
+constraints, in_vars, out_vars = lantern.as_z3(net)
+print("Z3 constraints, input variables, output variables (Real-sorted):")
+#print(constraints)
+print("Inputs:", in_vars)
+print("Outputs:", out_vars)
+
+in_pt_x = in_vars[0]
+in_pt_y = in_vars[1]
+out_class = out_vars[0]
+
+# Point in inner ring; should be class 1
+in_c = And(
+        (in_pt_x * in_pt_x) + (in_pt_y * in_pt_y) >= 0.16,   # radius >= 0.4
+        (in_pt_x * in_pt_x) + (in_pt_y * in_pt_y) <= 0.5625, # radius <= 0.75
+)
+out_c = out_class == 0 # classified as class 0 (outer ring)
+
+s = Solver()
+s.add(constraints)
+s.add(in_c)
+s.add(out_c)
+sat_check = s.check()
+if sat_check == sat:
+    print("Uh oh! Successfully found a counterexample:")
+
+    lin0_in_0 = Real("_lin0_in__0")
+    lin0_in_1 = Real("_lin0_in__1")
+    relu3_out_0 = Real("_relu3_out__0")
+
+    lin0_in_0_interp = s.model().get_interp(lin0_in_0)
+    lin0_in_1_interp = s.model().get_interp(lin0_in_1)
+    relu3_out_0_interp = s.model().get_interp(relu3_out_0)
+
+    counter_example_coords = [ eval(str(lin0_in_0_interp)),  eval(str(lin0_in_1_interp))]
+    counter_example_class = relu3_out_0_interp
+
+    print("Counter-example: ({}, {}) -> {}".format(counter_example_coords[0], counter_example_coords[1], counter_example_class))
+
+    # Confirm that the counter-example is indeed mapped to the wrong class.
+    counter_example_array = np.ndarray(shape=(1,2), dtype=float, buffer=np.array(counter_example_coords))
+    counter_example_input_tensor = torch.FloatTensor(counter_example_array)
+    counter_example_output_tensor = net(counter_example_input_tensor)
+    counter_example_output_class = np.where(counter_example_output_tensor.detach().numpy()<0.5, 0, 1)
+    print(counter_example_output_class)
+
+else:
+    print("Could not find a counterexample.")
