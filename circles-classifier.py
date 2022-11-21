@@ -11,16 +11,12 @@ import torch.nn as nn
 
 print("Using PyTorch Version %s" %torch.__version__)
 
-np.random.seed(0)
+np.random.seed(1)
 torch.manual_seed(0)
 
-# With noise = 0.02:
-# if factor <= 0.6, then accuracy is 100%
-# factor = 0.7 or 0.8, accuracy = 97%
-
-# With noise = 0.03:
-# factor = 0.6, 100% accuracy
-X, Y = make_circles(500, noise=0.03, factor=0.6)
+# Change noise to 0.6 for ~one incorrect point
+# Change factor to 0.8 for ~two incorrect points
+X, Y = make_circles(500, noise=0.05, factor=0.7)
 
 
 # Split into test and training data
@@ -31,7 +27,7 @@ X_train, X_test, Y_train, Y_test = train_test_split(X, Y,
 plt.figure(figsize=(12,8))
 plt.scatter(X_train[:,0], X_train[:,1], c=Y_train)
 plt.title('Circle Data')
-plt.show()
+#plt.show()
 
 
 #### Build the neural network
@@ -44,9 +40,13 @@ n_output = 1 # Number of output nodes = for binary classifier
 
 # Build your network
 net = nn.Sequential(
-    nn.Linear(n_input_dim, n_hidden),
+    nn.Linear(n_input_dim, 32),
     nn.ReLU(),
-    nn.Linear(n_hidden, n_output),
+    nn.Linear(32, 32),
+    nn.ReLU(),
+    nn.Linear(32, 16),
+    nn.ReLU(),
+    nn.Linear(16, 1),
     nn.ReLU())
 
 print(net)
@@ -64,7 +64,7 @@ optimizer = torch.optim.Adam(net.parameters(), lr=learning_rate)
 
 train_loss = []
 train_accuracy = []
-iters = 1000
+iters = 100
 Y_train_t = torch.FloatTensor(Y_train).reshape(-1, 1)
 for i in range(iters):
     X_train_t = torch.FloatTensor(X_train)
@@ -88,7 +88,7 @@ ax[1].set_ylabel('Classification Accuracy')
 ax[1].set_title('Training Accuracy')
 
 plt.tight_layout()
-plt.show()
+#plt.show()
 
 
 
