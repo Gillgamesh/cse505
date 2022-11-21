@@ -49,7 +49,8 @@ class ConstrainedClassifier:
             nn.Linear(n_input_dim, n_hidden),
             nn.ReLU(),
             nn.Linear(n_hidden, n_output),
-            nn.ReLU())
+            nn.ReLU(),
+        )
 
 
     def train_net(self):
@@ -167,7 +168,7 @@ def main():
     print("Z3: NN constraints, input variables, output variables (Real-sorted):")
     #print(nn_constraints)
     print("Inputs:", in_vars)
-    print("Outputs:", out_vars)
+    print("Outputs:", out_vars, end="\n\n")
 
     in_pt_x = in_vars[0]
     in_pt_y = in_vars[1]
@@ -176,23 +177,22 @@ def main():
     # If a point in the in inner ring is classified as being in the outer ring,
     # then we have found a counterexample.
     inner_point_classified_as_outer = And(
-            # Define point in inner donut: 0.4 <= radius <= 0.75
-            (in_pt_x * in_pt_x) + (in_pt_y * in_pt_y) >= 0.16,   # radius >= 0.4
-            (in_pt_x * in_pt_x) + (in_pt_y * in_pt_y) <= 0.5625, # radius <= 0.75
+            (in_pt_x * in_pt_x) + (in_pt_y * in_pt_y) <= 0.53,
             # Inner point classified in outer donut.
-            out_class == 0,
+            out_class <= 0.5,
     )
 
     # If a point in the in outer ring is classified as being in the inner ring,
     # then we have found a counterexample.
-    outer_point_classified_as_inner = And(
-            # Define point outside inner donut: 0.75 <= radius
-            (in_pt_x * in_pt_x) + (in_pt_y * in_pt_y) >= 0.5625, # radius >= 0.75
-            # Outer point classified in inner donut.
-            out_class == 1,
-    )
+    #outer_point_classified_as_inner = And(
+    #        # Define point outside inner donut: 0.75 <= radius
+    #        (in_pt_x * in_pt_x) + (in_pt_y * in_pt_y) >= 0.5625, # radius >= 0.75
+    #        # Outer point classified in inner donut.
+    #        out_class >= 0.5,
+    #)
 
-    counterexample_constraint = Or(inner_point_classified_as_outer, outer_point_classified_as_inner)
+    #counterexample_constraint = Or(inner_point_classified_as_outer, outer_point_classified_as_inner)
+    counterexample_constraint = inner_point_classified_as_outer
 
     s = Solver()
     s.add(nn_constraints)
@@ -212,12 +212,17 @@ def main():
         counterexample_coords = [eval(str(lin0_in_0_interp)),  eval(str(lin0_in_1_interp))]
         counterexample_class = relu3_out_0_interp
 
-        print("Z3 counterexample: ({}, {}) -> {}".format(counterexample_coords[0], counterexample_coords[1], counterexample_class))
+        classification_0_or_1 = None
+        if eval(str(counterexample_class)) >= 0.5:
+            classification_0_or_1 = 1
+        else:
+            classification_0_or_1 = 0
+
+        print("Z3 counterexample: ({}, {}) -> {}".format(counterexample_coords[0], counterexample_coords[1], classification_0_or_1))
         cc.classify_coordinate(counterexample_coords)
 
     else:
         print("Hooray! Failed to find a counterexample.")
-        cc.classify_coordinate([0.9, -0.1])
 
 if __name__ == '__main__':
     main()
