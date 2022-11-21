@@ -13,7 +13,14 @@ print("Using PyTorch Version %s" %torch.__version__)
 
 np.random.seed(0)
 torch.manual_seed(0)
-X, Y = make_circles(500, noise=0.02)
+
+# With noise = 0.02:
+# if factor <= 0.6, then accuracy is 100%
+# factor = 0.7 or 0.8, accuracy = 97%
+
+# With noise = 0.03:
+# factor = 0.6, 100% accuracy
+X, Y = make_circles(500, noise=0.03, factor=0.6)
 
 
 # Split into test and training data
@@ -32,7 +39,7 @@ plt.show()
 # Define network dimensions
 n_input_dim = X_train.shape[1]
 # Layer size
-n_hidden = 4 # Number of hidden nodes
+n_hidden = 6 # Number of hidden nodes
 n_output = 1 # Number of output nodes = for binary classifier
 
 # Build your network
@@ -125,5 +132,3 @@ plt.contourf(XX, YY, Z, cmap=plt.cm.Accent, alpha=0.5)
 plt.scatter(X_test[:,0], X_test[:,1], c=Y_test,
             cmap=plt.cm.Accent)
 plt.show()
-
-
