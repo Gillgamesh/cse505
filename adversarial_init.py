@@ -1,9 +1,23 @@
+# Data loading for MNIST: https://www.digitalocean.com/community/tutorials/mnist-dataset-in-python
+# https://medium.com/tebs-lab/how-to-classify-mnist-digits-with-different-neural-network-architectures-39c75a0f03e3
+
 import lantern
 from lantern import *
 from z3 import *
 import math
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+import torchvision
+from torchvision import datasets, transforms
+from torch import optim
+
+
+import matplotlib.pyplot as plt
+import numpy as np
+from keras.datasets import mnist
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
 
 '''
 Very simple 2-D example.
@@ -106,7 +120,6 @@ def simple_NN_ex():
     print_searched_sol(sol_tup)
 
 
-
 '''
 Assumptions: Given a lower and upper error such that
 1. lower error is always classifying without error (usually set to 0)
@@ -123,6 +136,7 @@ cp_err: the floating point comparison error. If abs(f1-f2) <= 0.001, then we con
 def search_alpha(norm, s: Solver, up, lo = 0.0, cp_err = 1e-3):
 
     # First need to check is lo would not cause mis-classification and up would cause mis-classification
+
     s.push()
     s.add(And(norm >= 0, norm <= lo))
     check_lo = s.check()
@@ -142,9 +156,11 @@ def search_alpha(norm, s: Solver, up, lo = 0.0, cp_err = 1e-3):
     sol_model = None
     # We need to loop when lower and upper are not equal
     while not math.isclose(lo, up, abs_tol=cp_err):
+
         # For each round, we need to compute the mid point
         # Also pushing solver to create a new scope
         alpha = (lo + up) / 2
+        print("Try out alpha: ", alpha)
         s.push()
         s.add(And(norm >= 0, norm <= alpha))
         check = s.check()
@@ -223,10 +239,240 @@ def get_max_norm(Xs, name = "max_norm_X"):
     return constraints, max_norm
 
 
+'''
+The MNIST section
+'''
+
+class MNIST:
+    def __init__(self):
+        self.load_data_set()
+        self.build_network()
+        return
+
+    def load_data_set(self):
+        # Preprocess the data and perform PCA
+        # Following: https://www.kaggle.com/code/jonathankristanto/experimenting-with-pca-on-mnist-dataset
+        (train_X, train_y), (test_X, test_y) = mnist.load_data()
+
+        train_X = train_X.reshape(60000, 784)
+        test_X = test_X.reshape(10000, 784)
+
+        train_X = train_X.astype('float32')
+        test_X = test_X.astype('float32')
+
+        train_y = train_y.astype('float32')
+        test_y = test_y.astype('float32')
+
+        sc = StandardScaler()
+        train_X = sc.fit_transform(train_X)
+        test_X = sc.transform(test_X)
+
+        pca = PCA(n_components=30)
+        pca.fit(train_X)
+        train_imgs = pca.transform(train_X)
+        test_imgs = pca.transform(test_X)
+
+        train_y_1_indices = np.where(np.array(train_y) == 1)
+        train_y_7_indices = np.where(np.array(train_y) == 7)
+        train_X1 = np.array(train_imgs[train_y_1_indices[0], :])
+        train_X7 = np.array(train_imgs[train_y_7_indices[0], :])
+        train_Y1 = np.array(train_y[train_y_1_indices[0]])
+        train_Y7 = np.array([0 for i in range(0, train_X7.shape[0])])
+
+        train_data = np.concatenate((train_X1, train_X7), axis=0)
+        train_label = np.concatenate((train_Y1, train_Y7))
+
+        test_y_1_indices = np.where(np.array(test_y) == 1)
+        test_y_7_indices = np.where(np.array(test_y) == 7)
+        test_X1 = np.array(test_imgs[test_y_1_indices[0], :])
+        test_X7 = np.array(test_imgs[test_y_7_indices[0], :])
+        test_Y1 = np.array(test_y[test_y_1_indices[0]])
+        test_Y7 = np.array([0 for k in range(0, test_X7.shape[0])])
+
+        test_data = np.concatenate((test_X1, test_X7), axis=0)
+        test_label = np.concatenate((test_Y1, test_Y7))
+
+        self.train_imgs = torch.from_numpy(train_data)
+        self.train_imgs_label = torch.from_numpy(train_label).reshape(-1, 1)
+        self.test_imgs = torch.from_numpy(test_data)
+        self.test_imgs_label = torch.from_numpy(test_label).reshape(-1, 1)
+        print('train_imgs: ' + str(self.train_imgs.size()))
+        print('train_imgs_label: ' + str(self.train_imgs_label.size()))
+        print('test_imgs: ' + str(self.test_imgs.size()))
+        print('test_imgs_label: ' + str(self.test_imgs_label.size()))
+
+
+    def build_network(self):
+        num_input = self.train_imgs.shape[1]
+        middle_dim = 10
+        self.net = nn.Sequential(
+            nn.Linear(num_input, middle_dim),
+            nn.ReLU(),
+            nn.Linear(middle_dim, middle_dim),
+            nn.ReLU(),
+            nn.Linear(middle_dim, 1),
+            nn.ReLU()
+        )
+    def train_network(self):
+        loss_func = nn.L1Loss()
+        learning_rate = 0.003
+        optimizer = torch.optim.Adam(self.net.parameters(), lr=learning_rate)
+
+        self.train_loss = []
+        self.train_accuracy = []
+        iters = 500
+        for i in range(iters):
+            y_hat = self.net(self.train_imgs)
+            loss = loss_func(y_hat, self.train_imgs_label)
+            loss.backward()
+            optimizer.step()
+            optimizer.zero_grad()
+            y_hat_class = np.where(y_hat.detach().numpy() < 0.5, 0, 1)
+            np_train_imgs_label = self.train_imgs_label.detach().numpy()
+            accuracy = np.sum(np_train_imgs_label==y_hat_class) / len(np_train_imgs_label)
+            self.train_accuracy.append(accuracy)
+            self.train_loss.append(loss.item())
+
+    def plot_training(self):
+        fig, ax = plt.subplots(2, 1, figsize=(12,8))
+        ax[0].plot(self.train_loss)
+        ax[0].set_ylabel('Loss')
+        ax[0].set_title('Training Loss')
+
+        ax[1].plot(self.train_accuracy)
+        ax[1].set_ylabel('Classification Accuracy')
+        ax[1].set_title('Training Accuracy')
+
+        plt.tight_layout()
+        #fig.savefig("./MNIST/Train Results")
+
+    def assess_net(self):
+        # Pass test data
+        y_hat_test = self.net(self.test_imgs)
+        y_hat_test_class = np.where(y_hat_test.detach().numpy() < 0.5, 0, 1)
+        np_test_imgs_label = self.test_imgs_label.detach().numpy()
+        test_accuracy = np.sum(np_test_imgs_label == y_hat_test_class) / len(np_test_imgs_label)
+        print("Test Accuracy {:.2f}".format(test_accuracy))
+
+def network_test(model, test_imgs, test_imgs_label):
+    net = model.layers
+    y_hat_test = net(test_imgs)
+    y_hat_test_class = np.where(y_hat_test.detach().numpy() < 0.5, 0, 1)
+    np_test_imgs_label = test_imgs_label.detach().numpy()
+    test_accuracy = np.sum(np_test_imgs_label == y_hat_test_class) / len(np_test_imgs_label)
+    print("Test Accuracy {:.2f}".format(test_accuracy))
+
+def plot_training_info(train_loss, train_accuracy):
+    fig, ax = plt.subplots(2, 1, figsize=(12, 8))
+    ax[0].plot(train_loss)
+    ax[0].set_ylabel('Loss')
+    ax[0].set_title('Training Loss')
+
+    ax[1].plot(train_accuracy)
+    ax[1].set_ylabel('Classification Accuracy')
+    ax[1].set_title('Training Accuracy')
+
+    plt.tight_layout()
+    plt.show()
+
+def MNIST_example():
+    # Loading network and do some plots.
+    model = torch.load("./MNIST/mnist_model.pt")
+    train_imgs = torch.load("./MNIST/train_imgs.pt")
+    train_imgs_label = torch.load("./MNIST/train_imgs_label.pt")
+    test_imgs = torch.load("./MNIST/test_imgs.pt")
+    test_imgs_label = torch.load("./MNIST/test_imgs_label.pt")
+    train_accuracy = torch.load("./MNIST/train_accuracy.pt")
+    train_loss = torch.load("./MNIST/train_loss.pt")
+    network_test(model, test_imgs, test_imgs_label)
+
+    net = model.layers
+    ex_img = test_imgs[0]
+    y_hat = net(ex_img)
+    if (y_hat < 0.5):
+        label = 0
+        print("The label is: ", label, " representing letter 7")
+    else:
+        label = 1
+        print("The label is: ", label, " representing letter 1")
+
+    # Try to plot the image
+    #ex_img = ex_img.detach().numpy().reshape(5, 6)
+    #plt.imshow(ex_img, interpolation='nearest')
+    #plt.show()
+    ex_img = ex_img.detach().numpy()
+    length = ex_img.shape[0]
+    constraints, in_vars, out_vars = lantern.as_z3(net)
+    print("Z3 constraints, input variables, output variables (Real-sorted):")
+    print(constraints)
+    print(in_vars)
+    print(out_vars)
+    print()
+
+    s = Solver()
+    s.add(constraints)
+
+    Xs = const_vector("x", length)
+    DXs = const_vector("dx", length)
+
+    s.add(And([Xs[i] == ex_img[i] for i in range(0, length)]))
+
+    # Construct the norm of the adversarial vector
+    dxs_norm_c, norm = get_max_norm(DXs)
+    s.add(dxs_norm_c)
+
+    # Add the adversarial addition to the initial vector and treat the sum as the input vector
+    adv_c, advs = add_adversarial(Xs, DXs)
+    s.add(adv_c)
+
+    # The variables that are the real input of the network.
+    s.add(And([in_vars[i] == advs[i] for i in range(0, len(advs))]))
+
+    # Constraint the output situation
+    s.add(out_vars[0] < 0.5)
+
+    # Search for the initial box.
+    sol_tup = search_alpha(norm, s, 0.5)
+    print_searched_sol(sol_tup)
+
+    # Plot the network training info
+    plot_training_info(train_loss, train_accuracy)
+
+
+class MNIST_Model(torch.nn.Module):
+    def __init__(self, seq: nn.Sequential):
+        super().__init__()
+        self.layers = seq
+
+    def forward(self, x):
+        return self.layers(x)
+
+
+def save_MNIST_Model_DATA():
+    mnist = MNIST()
+    mnist.train_network()
+    mnist_model = MNIST_Model(mnist.net)
+    torch.save(mnist_model, "./MNIST/mnist_model.pt")
+    torch.save(mnist.train_imgs, "./MNIST/train_imgs.pt")
+    torch.save(mnist.train_imgs_label, "./MNIST/train_imgs_label.pt")
+    torch.save(mnist.test_imgs, "./MNIST/test_imgs.pt")
+    torch.save(mnist.test_imgs_label, "./MNIST/test_imgs_label.pt")
+    torch.save(mnist.train_accuracy, "./MNIST/train_accuracy.pt")
+    torch.save(mnist.train_loss, "./MNIST/train_loss.pt")
+    mnist.plot_training()
+    mnist.assess_net()
+
+
 if __name__ == '__main__':
     #simple_find_box_distance(2)
     #test_norm()
     simple_NN_ex()
+    #save_MNIST_Model_DATA()
+    #MNIST_example()
+
+
+
+    print()
 '''
 Test float comparison
 abs_tol = 1e-4
