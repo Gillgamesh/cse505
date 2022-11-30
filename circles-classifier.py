@@ -2,7 +2,7 @@
 #
 # https://www.datahubbs.com/deep-learning-101-first-neural-network-with-pytorch/
 # https://medium.com/mlearning-ai/how-to-create-two-circles-in-sklearn-and-make-predictions-on-it-691a94e64f81
-
+from adversarial_init import *
 import numpy as np
 from sklearn.datasets import make_circles
 from sklearn.model_selection import train_test_split
@@ -139,6 +139,62 @@ class ConstrainedClassifier:
         print("NN classification: ({}, {}) is classified as {}.".format(coords[0], coords[1], coords_output_class[0][0]))
         return coords_output_class
 
+def adv_test():
+
+    print("Using PyTorch Version %s" % torch.__version__)
+    np.random.seed(6)
+    torch.manual_seed(0)
+
+    X, Y = make_circles(1000, noise=0.07, factor=0.6)
+    cc = ConstrainedClassifier(X, Y)
+
+    cc.plot_circles(pause_for_plot=False)
+
+    cc.build_net()
+    print(cc.net)
+
+    cc.train_net()
+
+    cc.plot_training(pause_for_plot=False)
+
+    cc.assess_net()
+    cc.plot_barrier(pause_for_plot=True)
+
+    ## Z3
+
+    nn_constraints, in_vars, out_vars = lantern.as_z3(cc.net)
+    print("Z3: NN constraints, input variables, output variables (Real-sorted):")
+    # print(nn_constraints)
+    print("Inputs:", in_vars)
+    print("Outputs:", out_vars, end="\n\n")
+    s = Solver()
+    s.add(nn_constraints)
+
+    Xs = const_vector("x", 2)
+    DXs = const_vector("dx", 2)
+    x1 = Xs[0]
+    x2 = Xs[1]
+    # Set the initial point to [0, 0]^T
+    s.add(And(x1 == 0, x2 == 0))
+
+    dxs_norm_c, norm = get_max_norm(DXs)
+    s.add(dxs_norm_c)
+
+    # Add the adversarial addition to the initial vector and treat the sum as the input vector
+    adv_c, advs = add_adversarial(Xs, DXs)
+    s.add(adv_c)
+
+    # The variables that are the real input of the network.
+    s.add(And([in_vars[i] == advs[i] for i in range(0, len(advs))]))
+
+    # Constraint the output situation
+    s.add(out_vars[0] <= 0.5)
+
+    # Search for the initial box.
+    sol_tup = search_alpha(norm, s, 0.7)
+    print_searched_sol(sol_tup)
+
+
 
 def main():
     print("Using PyTorch Version %s" %torch.__version__)
@@ -225,4 +281,5 @@ def main():
         print("Hooray! Failed to find a counterexample.")
 
 if __name__ == '__main__':
-    main()
+    #main()
+    adv_test()

@@ -40,8 +40,8 @@ def simple_find_box_distance(box_dim):
 
     # Making the assumption that the inner box is always contained in the outer box
     # Add the constraint of the inner box [-1, 1] x [-1, 1]
-    s.add(And(x1 <= 1, x1 >= -1, x2 <= 1, x2 >= -1))
-    #s.add(And(x1 == 0, x2 == 0))
+    #s.add(And(x1 <= 1, x1 >= -1, x2 <= 1, x2 >= -1))
+    s.add(And(x1 == 0, x2 == 0))
 
     # Construct the norm of the adversarial vector
     dxs_norm_c, norm = get_max_norm(DXs)
@@ -144,6 +144,7 @@ def search_alpha(norm, s: Solver, up, lo = 0.0, cp_err = 1e-3):
         print("lower bound is too large causing a mis-classification. Suggest lo = 0.0")
         exit(1)
     s.pop()
+    print("First bound check finish")
     s.push()
     s.add(And(norm >= 0, norm <= up))
     check_up = s.check()
@@ -151,6 +152,7 @@ def search_alpha(norm, s: Solver, up, lo = 0.0, cp_err = 1e-3):
         print("upper bound is not large enough to cause a mis-classification.")
         exit(1)
     s.pop()
+    print("Second bound check finish")
 
     # Main start of the binary search algorithm
     sol_model = None
@@ -239,6 +241,8 @@ def get_max_norm(Xs, name = "max_norm_X"):
     return constraints, max_norm
 
 
+
+
 '''
 The MNIST section
 '''
@@ -267,7 +271,7 @@ class MNIST:
         train_X = sc.fit_transform(train_X)
         test_X = sc.transform(test_X)
 
-        pca = PCA(n_components=30)
+        pca = PCA(n_components=10)
         pca.fit(train_X)
         train_imgs = pca.transform(train_X)
         test_imgs = pca.transform(test_X)
@@ -304,12 +308,12 @@ class MNIST:
 
     def build_network(self):
         num_input = self.train_imgs.shape[1]
-        middle_dim = 10
+        middle_dim = 4
         self.net = nn.Sequential(
             nn.Linear(num_input, middle_dim),
             nn.ReLU(),
-            nn.Linear(middle_dim, middle_dim),
-            nn.ReLU(),
+            #nn.Linear(middle_dim, middle_dim),
+            #nn.ReLU(),
             nn.Linear(middle_dim, 1),
             nn.ReLU()
         )
@@ -344,6 +348,7 @@ class MNIST:
         ax[1].set_title('Training Accuracy')
 
         plt.tight_layout()
+        plt.show()
         #fig.savefig("./MNIST/Train Results")
 
     def assess_net(self):
@@ -375,15 +380,15 @@ def plot_training_info(train_loss, train_accuracy):
     plt.tight_layout()
     plt.show()
 
-def MNIST_example():
+def MNIST_example(name = "./MNIST2/"):
     # Loading network and do some plots.
-    model = torch.load("./MNIST/mnist_model.pt")
-    train_imgs = torch.load("./MNIST/train_imgs.pt")
-    train_imgs_label = torch.load("./MNIST/train_imgs_label.pt")
-    test_imgs = torch.load("./MNIST/test_imgs.pt")
-    test_imgs_label = torch.load("./MNIST/test_imgs_label.pt")
-    train_accuracy = torch.load("./MNIST/train_accuracy.pt")
-    train_loss = torch.load("./MNIST/train_loss.pt")
+    model = torch.load(name + "mnist_model.pt")
+    train_imgs = torch.load(name + "train_imgs.pt")
+    train_imgs_label = torch.load(name + "train_imgs_label.pt")
+    test_imgs = torch.load(name + "test_imgs.pt")
+    test_imgs_label = torch.load(name + "test_imgs_label.pt")
+    train_accuracy = torch.load(name + "train_accuracy.pt")
+    train_loss = torch.load(name + "train_loss.pt")
     network_test(model, test_imgs, test_imgs_label)
 
     net = model.layers
@@ -403,6 +408,7 @@ def MNIST_example():
     ex_img = ex_img.detach().numpy()
     length = ex_img.shape[0]
     constraints, in_vars, out_vars = lantern.as_z3(net)
+    z3.set_param("parallel.enable", "true");
     print("Z3 constraints, input variables, output variables (Real-sorted):")
     print(constraints)
     print(in_vars)
@@ -432,7 +438,7 @@ def MNIST_example():
     s.add(out_vars[0] < 0.5)
 
     # Search for the initial box.
-    sol_tup = search_alpha(norm, s, 0.5)
+    sol_tup = search_alpha(norm, s, 2)
     print_searched_sol(sol_tup)
 
     # Plot the network training info
@@ -447,29 +453,33 @@ class MNIST_Model(torch.nn.Module):
     def forward(self, x):
         return self.layers(x)
 
-
-def save_MNIST_Model_DATA():
+def simply_train_MNIST():
     mnist = MNIST()
     mnist.train_network()
-    mnist_model = MNIST_Model(mnist.net)
-    torch.save(mnist_model, "./MNIST/mnist_model.pt")
-    torch.save(mnist.train_imgs, "./MNIST/train_imgs.pt")
-    torch.save(mnist.train_imgs_label, "./MNIST/train_imgs_label.pt")
-    torch.save(mnist.test_imgs, "./MNIST/test_imgs.pt")
-    torch.save(mnist.test_imgs_label, "./MNIST/test_imgs_label.pt")
-    torch.save(mnist.train_accuracy, "./MNIST/train_accuracy.pt")
-    torch.save(mnist.train_loss, "./MNIST/train_loss.pt")
     mnist.plot_training()
     mnist.assess_net()
 
+def save_MNIST_Model_DATA(name = "./MNIST2/"):
+    mnist = MNIST()
+    mnist.train_network()
+    mnist_model = MNIST_Model(mnist.net)
+    torch.save(mnist_model, name + "mnist_model.pt")
+    torch.save(mnist.train_imgs, name + "train_imgs.pt")
+    torch.save(mnist.train_imgs_label, name + "train_imgs_label.pt")
+    torch.save(mnist.test_imgs, name + "test_imgs.pt")
+    torch.save(mnist.test_imgs_label, name + "test_imgs_label.pt")
+    torch.save(mnist.train_accuracy, name + "train_accuracy.pt")
+    torch.save(mnist.train_loss, name + "train_loss.pt")
+    mnist.plot_training()
+    mnist.assess_net()
 
 if __name__ == '__main__':
     #simple_find_box_distance(2)
     #test_norm()
-    simple_NN_ex()
+    #simple_NN_ex()
     #save_MNIST_Model_DATA()
     #MNIST_example()
-
+    #simply_train_MNIST()
 
 
     print()
