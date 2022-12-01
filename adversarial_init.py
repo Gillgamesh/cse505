@@ -182,6 +182,9 @@ def search_alpha(norm, s: Solver, up, lo = 0.0, cp_err = 1e-3):
     # up --> a min bound of modification over input would change the output (tolerating the cp_err)
     return (lo, up, sol_model)
 
+# Notice that the up would store the last alpha which satisfy the whole constrain. And the constrain MUST contain a
+# wrong prediction of the output.
+# Therefore the sol_model would always store the closest model of wrong prediction.
 def print_searched_sol(tup):
     lo = tup[0]
     up = tup[1]
@@ -281,6 +284,7 @@ class MNIST:
         pca.fit(train_X)
         train_imgs = pca.transform(train_X)
         test_imgs = pca.transform(test_X)
+        self.pca = pca
 
         train_y_1_indices = np.where(np.array(train_y) == 1)
         train_y_7_indices = np.where(np.array(train_y) == 7)
@@ -386,8 +390,12 @@ def plot_training_info(train_loss, train_accuracy):
     plt.tight_layout()
     plt.show()
 
+#def get_origin_MNIST_test_img(name = "./MNIST2/"):
+
+
 def MNIST_example(name = "./MNIST2/"):
     # Loading network and do some plots.
+    pca = torch.load(name + "mnist_pca.pt")
     model = torch.load(name + "mnist_model.pt")
     train_imgs = torch.load(name + "train_imgs.pt")
     train_imgs_label = torch.load(name + "train_imgs_label.pt")
@@ -412,9 +420,14 @@ def MNIST_example(name = "./MNIST2/"):
     #plt.imshow(ex_img, interpolation='nearest')
     #plt.show()
     ex_img = ex_img.detach().numpy()
+    ex_img_origin = pca.inverse_transform(ex_img).reshape([28,28])
+    plt.imshow(ex_img_origin, cmap='gray_r')
+    plt.title('Test image without input', fontsize=15, pad=15)
+    plt.savefig("test_img_without_input.png")
+
     length = ex_img.shape[0]
     constraints, in_vars, out_vars = lantern.as_z3(net)
-    z3.set_param("parallel.enable", "true");
+    z3.set_param("parallel.enable", "true")
     print("Z3 constraints, input variables, output variables (Real-sorted):")
     print(constraints)
     print(in_vars)
@@ -440,12 +453,24 @@ def MNIST_example(name = "./MNIST2/"):
     # The variables that are the real input of the network.
     s.add(And([in_vars[i] == advs[i] for i in range(0, len(advs))]))
 
-    # Constraint the output situation
+    # Constraint the output situation (classifying to case of 7)
     s.add(out_vars[0] < 0.5)
 
     # Search for the initial box.
     sol_tup = search_alpha(norm, s, 2)
     print_searched_sol(sol_tup)
+
+    # get the dx evaluations
+    dxs_interp = []
+    sol_model = sol_tup[2]
+    for i in range(0, len(advs)):
+        dxs_interp.append(eval(str(sol_model.get_interp(advs[i]))))
+
+    # get the modified image array
+    dxs_interp_origin = pca.inverse_transform(dxs_interp).reshape([28, 28])
+    plt.imshow(dxs_interp_origin, cmap='gray_r')
+    plt.title('Test image with input', fontsize=15, pad=15)
+    plt.savefig("test_img_with_input.png")
 
     # Plot the network training info
     plot_training_info(train_loss, train_accuracy)
@@ -469,6 +494,7 @@ def save_MNIST_Model_DATA(name = "./MNIST2/"):
     mnist = MNIST()
     mnist.train_network()
     mnist_model = MNIST_Model(mnist.net)
+    torch.save(mnist.pca, name + "mnist_pca.pt")
     torch.save(mnist_model, name + "mnist_model.pt")
     torch.save(mnist.train_imgs, name + "train_imgs.pt")
     torch.save(mnist.train_imgs_label, name + "train_imgs_label.pt")
@@ -484,7 +510,7 @@ if __name__ == '__main__':
     #test_norm()
     #simple_NN_ex()
     #save_MNIST_Model_DATA()
-    #MNIST_example()
+    MNIST_example()
     #simply_train_MNIST()
 
 

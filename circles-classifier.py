@@ -282,5 +282,5 @@ def main():
         print("Hooray! Failed to find a counterexample.")
 
 if __name__ == '__main__':
-    #main()
-    adv_test()
+    main()
+    #adv_test()
