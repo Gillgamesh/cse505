@@ -4,20 +4,15 @@
 import lantern
 from lantern import *
 from z3 import *
-import math
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import torchvision
-from torchvision import datasets, transforms
-from torch import optim
-
-
-import matplotlib.pyplot as plt
-import numpy as np
 from keras.datasets import mnist
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
+import math
+import torch
+import torch.nn as nn
+import matplotlib.pyplot as plt
+import numpy as np
+import sys
 
 '''
 Very simple 2-D example.
@@ -28,6 +23,10 @@ And everything else is classified as class 2.
 Goal is to find the min norm(Delta X) such that the inner box + Delta X is classified as class 2.  
 '''
 def simple_find_box_distance(box_dim):
+    # Redirect the print statement to the log file
+    original_stdout = sys.stdout
+    f = open("./LogFiles/box_example.txt", 'w')
+    sys.stdout = f
 
     Xs = const_vector("x", box_dim)
     DXs = const_vector("dx", box_dim)
@@ -60,6 +59,10 @@ def simple_find_box_distance(box_dim):
     #    or set the checking condition without an equal sign.
     sol_tup = search_alpha(norm, s, 20)
     print_searched_sol(sol_tup)
+
+    # Set back the printing files
+    sys.stdout = original_stdout
+    f.close()
     return
 
 '''
@@ -68,6 +71,11 @@ The input is [0, 0]^T, and the output is bounded by the range of [-1, 3]
 Goal is to find the box which is [-1, 1] x [-1, 1] in the input to be safe 
 '''
 def simple_NN_ex():
+    # Redirect the print statement to the log file
+    original_stdout = sys.stdout
+    f = open("./LogFiles/NN_example.txt", 'w')
+    sys.stdout = f
+
     # Obtain the network and the corresponding constraints.
     lin = nn.Linear(2, 1)
     nn.init.ones_(lin.weight)
@@ -119,6 +127,9 @@ def simple_NN_ex():
     sol_tup = search_alpha(norm, s, 2)
     print_searched_sol(sol_tup)
 
+    # Set back the printing files
+    sys.stdout = original_stdout
+    f.close()
 
 '''
 Assumptions: Given a lower and upper error such that
@@ -401,6 +412,11 @@ def plot_training_info(train_loss, train_accuracy):
 
 
 def MNIST_example(name = "./MNIST2/"):
+    # Redirect the print statement to the log file
+    original_stdout = sys.stdout
+    f = open("./LogFiles/MNIST_example.txt", 'w')
+    sys.stdout = f
+
     # Loading network and do some plots.
     pca = torch.load(name + "mnist_pca.pt")
     train_imgs_origin = torch.load(name + "train_imgs_origin.pt")
@@ -484,6 +500,14 @@ def MNIST_example(name = "./MNIST2/"):
     for i in range(0, len(advs)):
         dxs_interp.append(eval(str(sol_model.get_interp(advs[i]))))
 
+    dxs_interp_result = net(torch.asarray(dxs_interp))
+    if (dxs_interp_result < 0.5):
+        label = 0
+        print("The label of the perturbed image is: ", label, " representing letter 7")
+    else:
+        label = 1
+        print("The label of the perturbed image is: ", label, " representing letter 1")
+
     # get the modified image array
     dxs_interp_origin = pca.inverse_transform(dxs_interp).reshape([28, 28])
     plt.imshow(dxs_interp_origin, cmap='gray_r')
@@ -493,6 +517,9 @@ def MNIST_example(name = "./MNIST2/"):
     # Plot the network training info
     plot_training_info(train_loss, train_accuracy)
 
+    # Set back the printing files
+    sys.stdout = original_stdout
+    f.close()
 
 class MNIST_Model(torch.nn.Module):
     def __init__(self, seq: nn.Sequential):
@@ -535,16 +562,17 @@ if __name__ == '__main__':
 
 
     print()
+
 '''
+Several testing experiments:
+
 Test float comparison
 abs_tol = 1e-4
 r1 = 0.1234
 r2 = 0.123500000000001
 #print(r1 == r2)
 print(math.isclose(r1, r2, abs_tol=abs_tol))
-'''
 
-'''
 test z3 solver pushing and popping
 x1 = Int('x1')
 x2 = Int('x2')

@@ -1,0 +1,40 @@
+A PyTorch network:
+Sequential(
+  (0): Linear(in_features=2, out_features=1, bias=True)
+  (1): ReLU()
+)
+Network parameters:
+[Parameter containing:
+tensor([[1., 1.]], requires_grad=True), Parameter containing:
+tensor([1.], requires_grad=True)]
+Z3 constraints, input variables, output variables (Real-sorted):
+[_lin0_out__0 == 1 + _lin0_in__0 + _lin0_in__1, _relu1_out__0 == If(_lin0_out__0 >= 0, _lin0_out__0, 0)]
+[_lin0_in__0, _lin0_in__1]
+[_relu1_out__0]
+
+First bound check finish
+Second bound check finish
+Try out alpha:  1.0
+Try out alpha:  0.5
+Try out alpha:  0.25
+Try out alpha:  0.375
+Try out alpha:  0.4375
+Try out alpha:  0.46875
+Try out alpha:  0.484375
+Try out alpha:  0.4921875
+Try out alpha:  0.49609375
+Try out alpha:  0.498046875
+Try out alpha:  0.4990234375
+The max error rate without mis-classification is:  0.4990234375
+The min error rate with mis-classification is:  0.5
+[_relu1_out__0 = 3,
+ dx__1 = 1/2,
+ _lin0_out__0 = 3,
+ adv__0 = 1,
+ x__1 = 1/2,
+ _lin0_in__0 = 1,
+ _lin0_in__1 = 1,
+ adv__1 = 1,
+ x__0 = 1/2,
+ max_norm_X = 1/2,
+ dx__0 = 1/2]
