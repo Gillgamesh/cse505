@@ -282,14 +282,11 @@ class MNIST:
 
         pca = PCA(n_components=10)
         pca.fit(train_X)
-        train_imgs = pca.transform(train_X)
-        test_imgs = pca.transform(test_X)
-        self.pca = pca
 
         train_y_1_indices = np.where(np.array(train_y) == 1)
         train_y_7_indices = np.where(np.array(train_y) == 7)
-        train_X1 = np.array(train_imgs[train_y_1_indices[0], :])
-        train_X7 = np.array(train_imgs[train_y_7_indices[0], :])
+        train_X1 = np.array(train_X[train_y_1_indices[0], :])
+        train_X7 = np.array(train_X[train_y_7_indices[0], :])
         train_Y1 = np.array(train_y[train_y_1_indices[0]])
         train_Y7 = np.array([0 for i in range(0, train_X7.shape[0])])
 
@@ -298,17 +295,27 @@ class MNIST:
 
         test_y_1_indices = np.where(np.array(test_y) == 1)
         test_y_7_indices = np.where(np.array(test_y) == 7)
-        test_X1 = np.array(test_imgs[test_y_1_indices[0], :])
-        test_X7 = np.array(test_imgs[test_y_7_indices[0], :])
+        test_X1 = np.array(test_X[test_y_1_indices[0], :])
+        test_X7 = np.array(test_X[test_y_7_indices[0], :])
         test_Y1 = np.array(test_y[test_y_1_indices[0]])
         test_Y7 = np.array([0 for k in range(0, test_X7.shape[0])])
 
         test_data = np.concatenate((test_X1, test_X7), axis=0)
         test_label = np.concatenate((test_Y1, test_Y7))
 
-        self.train_imgs = torch.from_numpy(train_data)
+        # Store the original images before applying to PCA
+        self.train_imgs_origin = torch.from_numpy(train_data)
+        self.test_imgs_origin = torch.from_numpy(test_data)
+
+        # Apply the pca to those selected data
+        train_imgs = pca.transform(train_data)
+        test_imgs = pca.transform(test_data)
+        self.pca = pca
+
+        # Store those transformed data
+        self.train_imgs = torch.from_numpy(train_imgs)
         self.train_imgs_label = torch.from_numpy(train_label).reshape(-1, 1)
-        self.test_imgs = torch.from_numpy(test_data)
+        self.test_imgs = torch.from_numpy(test_imgs)
         self.test_imgs_label = torch.from_numpy(test_label).reshape(-1, 1)
         print('train_imgs: ' + str(self.train_imgs.size()))
         print('train_imgs_label: ' + str(self.train_imgs_label.size()))
@@ -396,6 +403,8 @@ def plot_training_info(train_loss, train_accuracy):
 def MNIST_example(name = "./MNIST2/"):
     # Loading network and do some plots.
     pca = torch.load(name + "mnist_pca.pt")
+    train_imgs_origin = torch.load(name + "train_imgs_origin.pt")
+    test_imgs_origin = torch.load(name + "test_imgs_origin.pt")
     model = torch.load(name + "mnist_model.pt")
     train_imgs = torch.load(name + "train_imgs.pt")
     train_imgs_label = torch.load(name + "train_imgs_label.pt")
@@ -405,8 +414,20 @@ def MNIST_example(name = "./MNIST2/"):
     train_loss = torch.load(name + "train_loss.pt")
     network_test(model, test_imgs, test_imgs_label)
 
+    # Obtain the network from the model
     net = model.layers
-    ex_img = test_imgs[0]
+
+    # Choose an original img, which label should be 1
+    selected_img = train_imgs_origin[0].detach().numpy()
+
+    # Plot the original img
+    plt.imshow(selected_img.reshape([28, 28]), cmap='gray_r')
+    plt.title('The image without PCA', fontsize=15, pad=15)
+    plt.savefig("img_without_pca.png")
+
+    # Obtained the PCA transformed selected img
+    pca_transformed_img = pca.transform(selected_img.reshape(1, -1))[0]
+    ex_img = torch.from_numpy(pca_transformed_img)
     y_hat = net(ex_img)
     if (y_hat < 0.5):
         label = 0
@@ -415,15 +436,12 @@ def MNIST_example(name = "./MNIST2/"):
         label = 1
         print("The label is: ", label, " representing letter 1")
 
-    # Try to plot the image
-    #ex_img = ex_img.detach().numpy().reshape(5, 6)
-    #plt.imshow(ex_img, interpolation='nearest')
-    #plt.show()
+    # Plot the img after pca
     ex_img = ex_img.detach().numpy()
     ex_img_origin = pca.inverse_transform(ex_img).reshape([28,28])
     plt.imshow(ex_img_origin, cmap='gray_r')
-    plt.title('Test image without input', fontsize=15, pad=15)
-    plt.savefig("test_img_without_input.png")
+    plt.title('Image after pca without input', fontsize=15, pad=15)
+    plt.savefig("pca_img_without_input.png")
 
     length = ex_img.shape[0]
     constraints, in_vars, out_vars = lantern.as_z3(net)
@@ -469,8 +487,8 @@ def MNIST_example(name = "./MNIST2/"):
     # get the modified image array
     dxs_interp_origin = pca.inverse_transform(dxs_interp).reshape([28, 28])
     plt.imshow(dxs_interp_origin, cmap='gray_r')
-    plt.title('Test image with input', fontsize=15, pad=15)
-    plt.savefig("test_img_with_input.png")
+    plt.title('pca image with input', fontsize=15, pad=15)
+    plt.savefig("pca_img_with_input.png")
 
     # Plot the network training info
     plot_training_info(train_loss, train_accuracy)
@@ -495,6 +513,8 @@ def save_MNIST_Model_DATA(name = "./MNIST2/"):
     mnist.train_network()
     mnist_model = MNIST_Model(mnist.net)
     torch.save(mnist.pca, name + "mnist_pca.pt")
+    torch.save(mnist.train_imgs_origin, name + "train_imgs_origin.pt")
+    torch.save(mnist.test_imgs_origin, name + "test_imgs_origin.pt")
     torch.save(mnist_model, name + "mnist_model.pt")
     torch.save(mnist.train_imgs, name + "train_imgs.pt")
     torch.save(mnist.train_imgs_label, name + "train_imgs_label.pt")
