@@ -177,7 +177,8 @@ def adv_test():
     # Set the initial point to [0, 0]^T
     s.add(And(x1 == 0, x2 == 0))
 
-    dxs_norm_c, norm = get_max_norm(DXs)
+    dxs_norm_c, norm = get_L2_square_norm(DXs)
+    #dxs_norm_c, norm = get_max_norm(DXs)
     s.add(dxs_norm_c)
 
     # Add the adversarial addition to the initial vector and treat the sum as the input vector

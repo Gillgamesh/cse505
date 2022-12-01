@@ -240,8 +240,14 @@ def get_max_norm(Xs, name = "max_norm_X"):
     constraints.append(constraint)
     return constraints, max_norm
 
-
-
+'''
+This function only works for 2_D
+'''
+def get_L2_square_norm(Xs, name = "max_L2_norm_X"):
+    print("Constraining a L2 norm! Only works for 2-D cases")
+    max_norm = Real(name)
+    constraints = [z3.simplify(max_norm == ((Xs[0] * Xs[0]) + (Xs[1] * Xs[1])))]
+    return constraints, max_norm
 
 '''
 The MNIST section
