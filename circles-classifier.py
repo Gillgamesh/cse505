@@ -139,8 +139,85 @@ class ConstrainedClassifier:
         print("NN classification: ({}, {}) is classified as {}.".format(coords[0], coords[1], coords_output_class[0][0]))
         return coords_output_class
 
+    def z3_setup(self):
+        # Convert the neural network into constraints on each layer's
+        # input and output
+        self.nn_constraints, self.in_vars, self.out_vars = lantern.as_z3(self.net)
+
+        #print("Z3: NN constraints, input variables, output variables (Real-sorted):")
+        #print(nn_constraints)
+        print("Z3 Inputs:", self.in_vars)
+        print("Z3 Outputs:", self.out_vars, end="\n\n")
+
+
+    def z3_get_constraint_inner_as_outer(self):
+        in_pt_x = self.in_vars[0]
+        in_pt_y = self.in_vars[1]
+        out_class = self.out_vars[0]
+
+        # If a point in the in inner ring is classified as being in the outer ring,
+        # then we have found a counterexample.
+        inner_point_classified_as_outer = And(
+                (in_pt_x * in_pt_x) + (in_pt_y * in_pt_y) <= 0.53, # radius = 0.75
+                # Inner point classified in outer donut.
+                out_class <= 0.5,
+        )
+
+        return inner_point_classified_as_outer
+
+    def z3_get_constraint_outer_as_inner(self):
+        in_pt_x = self.in_vars[0]
+        in_pt_y = self.in_vars[1]
+        out_class = self.out_vars[0]
+
+        # If a point in the in outer ring is classified as being in the inner ring,
+        # then we have found a counterexample.
+        outer_point_classified_as_inner = And(
+                # Define point outside inner donut: 0.75 <= radius
+                (in_pt_x * in_pt_x) + (in_pt_y * in_pt_y) >= 0.53, # radius = 0.75
+                # Outer point classified in inner donut.
+                out_class >= 0.5,
+        )
+
+        return outer_point_classified_as_inner
+
+    def z3_find_counterexample(self, counterexample_constraint):
+        s = Solver()
+        s.add(self.nn_constraints)
+        s.add(counterexample_constraint)
+        sat_check = s.check()
+        if sat_check == sat:
+            print("Uh oh! Successfully found a counterexample:")
+
+            # Extract counterexample from Z3
+            lin0_in_0 = Real("_lin0_in__0")
+            lin0_in_1 = Real("_lin0_in__1")
+            relu3_out_0 = Real("_relu3_out__0")
+
+            lin0_in_0_interp = s.model().get_interp(lin0_in_0)
+            lin0_in_1_interp = s.model().get_interp(lin0_in_1)
+            relu3_out_0_interp = s.model().get_interp(relu3_out_0)
+
+            counterexample_coords = [eval(str(lin0_in_0_interp)),  eval(str(lin0_in_1_interp))]
+            counterexample_class = relu3_out_0_interp
+
+            classification_0_or_1 = None
+            if eval(str(counterexample_class)) >= 0.5:
+                classification_0_or_1 = 1
+            else:
+                classification_0_or_1 = 0
+
+            print("Z3 counterexample: ({}, {}) -> {}".format(counterexample_coords[0], counterexample_coords[1], classification_0_or_1))
+
+            # Confirm that the NN misclassifies the point as Z3 says it will.
+            self.classify_coordinate(counterexample_coords)
+
+        else:
+            print("Hooray! Failed to find a counterexample.")
+
 
 def main():
+    # Dataset
     print("Using PyTorch Version %s" %torch.__version__)
     np.random.seed(6)
     torch.manual_seed(0)
@@ -149,6 +226,8 @@ def main():
     cc = ConstrainedClassifier(X, Y)
 
     cc.plot_circles(pause_for_plot=False)
+
+    # NN
 
     cc.build_net()
     print(cc.net)
@@ -160,69 +239,18 @@ def main():
     cc.assess_net()
     cc.plot_barrier(pause_for_plot=True)
 
+    # Z3
 
+    cc.z3_setup()
 
-    ## Z3
+    print("Misclassification of inner point?")
+    inner_as_outer = cc.z3_get_constraint_inner_as_outer()
+    cc.z3_find_counterexample(inner_as_outer)
 
-    nn_constraints, in_vars, out_vars = lantern.as_z3(cc.net)
-    print("Z3: NN constraints, input variables, output variables (Real-sorted):")
-    #print(nn_constraints)
-    print("Inputs:", in_vars)
-    print("Outputs:", out_vars, end="\n\n")
+    print("\nMisclassification of outer point?")
+    outer_as_inner = cc.z3_get_constraint_outer_as_inner()
+    cc.z3_find_counterexample(outer_as_inner)
 
-    in_pt_x = in_vars[0]
-    in_pt_y = in_vars[1]
-    out_class = out_vars[0]
-
-    # If a point in the in inner ring is classified as being in the outer ring,
-    # then we have found a counterexample.
-    inner_point_classified_as_outer = And(
-            (in_pt_x * in_pt_x) + (in_pt_y * in_pt_y) <= 0.53,
-            # Inner point classified in outer donut.
-            out_class <= 0.5,
-    )
-
-    # If a point in the in outer ring is classified as being in the inner ring,
-    # then we have found a counterexample.
-    #outer_point_classified_as_inner = And(
-    #        # Define point outside inner donut: 0.75 <= radius
-    #        (in_pt_x * in_pt_x) + (in_pt_y * in_pt_y) >= 0.5625, # radius >= 0.75
-    #        # Outer point classified in inner donut.
-    #        out_class >= 0.5,
-    #)
-
-    #counterexample_constraint = Or(inner_point_classified_as_outer, outer_point_classified_as_inner)
-    counterexample_constraint = inner_point_classified_as_outer
-
-    s = Solver()
-    s.add(nn_constraints)
-    s.add(counterexample_constraint)
-    sat_check = s.check()
-    if sat_check == sat:
-        print("Uh oh! Successfully found a counterexample:")
-
-        lin0_in_0 = Real("_lin0_in__0")
-        lin0_in_1 = Real("_lin0_in__1")
-        relu3_out_0 = Real("_relu3_out__0")
-
-        lin0_in_0_interp = s.model().get_interp(lin0_in_0)
-        lin0_in_1_interp = s.model().get_interp(lin0_in_1)
-        relu3_out_0_interp = s.model().get_interp(relu3_out_0)
-
-        counterexample_coords = [eval(str(lin0_in_0_interp)),  eval(str(lin0_in_1_interp))]
-        counterexample_class = relu3_out_0_interp
-
-        classification_0_or_1 = None
-        if eval(str(counterexample_class)) >= 0.5:
-            classification_0_or_1 = 1
-        else:
-            classification_0_or_1 = 0
-
-        print("Z3 counterexample: ({}, {}) -> {}".format(counterexample_coords[0], counterexample_coords[1], classification_0_or_1))
-        cc.classify_coordinate(counterexample_coords)
-
-    else:
-        print("Hooray! Failed to find a counterexample.")
 
 if __name__ == '__main__':
     main()
