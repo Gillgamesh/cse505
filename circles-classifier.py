@@ -22,9 +22,19 @@ class ConstrainedClassifier:
         self.X = X
         self.Y = Y
 
-    def plot_circles(self, pause_for_plot=False):
-        df = pandas.DataFrame(dict(x=self.X[:,0], y=self.X[:,1], label=self.Y))
-        colors = {0: 'red', 1: 'blue'}
+    def plot_circles(self, pause_for_plot=False, misclassified_inner=None):
+        Xs = self.X[:,0]
+        Ys = self.X[:,1]
+        labels = self.Y
+
+        if misclassified_inner != None:
+            for p in misclassified_inner:
+                Xs = np.append(Xs, p[0])
+                Ys = np.append(Ys, p[1])
+                labels = np.append(labels, 2)
+
+        df = pandas.DataFrame(dict(x=Xs, y=Ys, label=labels))
+        colors = {0: 'red', 1: 'blue', 2: '#00ff00'}
         fig, ax = plt.subplots(figsize=(12,8))
         grouped = df.groupby('label')
         for key, group in grouped:
@@ -158,7 +168,7 @@ class ConstrainedClassifier:
         # If a point in the in inner ring is classified as being in the outer ring,
         # then we have found a counterexample.
         inner_point_classified_as_outer = And(
-                (in_pt_x * in_pt_x) + (in_pt_y * in_pt_y) <= 0.53, # radius = 0.75
+                (in_pt_x * in_pt_x) + (in_pt_y * in_pt_y) <= 0.53,
                 # Inner point classified in outer donut.
                 out_class <= 0.5,
         )
@@ -173,8 +183,8 @@ class ConstrainedClassifier:
         # If a point in the in outer ring is classified as being in the inner ring,
         # then we have found a counterexample.
         outer_point_classified_as_inner = And(
-                # Define point outside inner donut: 0.75 <= radius
-                (in_pt_x * in_pt_x) + (in_pt_y * in_pt_y) >= 0.53, # radius = 0.75
+                # Define point outside inner donut
+                (in_pt_x * in_pt_x) + (in_pt_y * in_pt_y) >= 0.53,
                 # Outer point classified in inner donut.
                 out_class >= 0.5,
         )
@@ -237,7 +247,7 @@ def main():
     cc.plot_training(pause_for_plot=False)
 
     cc.assess_net()
-    cc.plot_barrier(pause_for_plot=True)
+    cc.plot_barrier(pause_for_plot=False)
 
     # Z3
 
@@ -251,6 +261,15 @@ def main():
     outer_as_inner = cc.z3_get_constraint_outer_as_inner()
     cc.z3_find_counterexample(outer_as_inner)
 
+    cc.plot_circles(pause_for_plot=True, misclassified_inner=([
+        # Misclassified points determined through trial and error.
+        (0.125, 0.71484375),
+        (-0.71875, 0.109375),
+        (-0.09375, -0.71875),
+        (-0.0625, -0.72265625),
+        (0.734375, -0.09375),
+        (0.0625, -0.73828125),
+    ]))
 
 if __name__ == '__main__':
     main()
