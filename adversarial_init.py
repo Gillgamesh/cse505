@@ -223,12 +223,12 @@ def add_adversarial(Xs, DXs):
 
 def test_norm():
     Xs = const_vector("x", 4)
-    x1 = Xs[0]
-    x2 = Xs[1]
-    x3 = Xs[2]
-    x4 = Xs[3]
+    x0 = Xs[0]
+    x1 = Xs[1]
+    x2 = Xs[2]
+    x3 = Xs[3]
     s = Solver()
-    s.add(And(x1 == -5, x2 == 4, x3 == 20, x4 == -50))
+    s.add(And(x0 == -5, x1 == 4, x2 == 20, x3 == -50))
     x_c, norm = get_max_norm(Xs)
     s.add(x_c)
     check = s.check()
@@ -554,10 +554,10 @@ def save_MNIST_Model_DATA(name = "./MNIST2/"):
 
 if __name__ == '__main__':
     #simple_find_box_distance(2)
-    #test_norm()
+    test_norm()
     #simple_NN_ex()
     #save_MNIST_Model_DATA()
-    MNIST_example()
+    #MNIST_example()
     #simply_train_MNIST()
 
 

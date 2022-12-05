@@ -27,14 +27,6 @@ Try out alpha:  0.498046875
 Try out alpha:  0.4990234375
 The max error rate without mis-classification is:  0.4990234375
 The min error rate with mis-classification is:  0.5
-[_relu1_out__0 = 3,
- dx__1 = 1/2,
- _lin0_out__0 = 3,
- adv__0 = 1,
- x__1 = 1/2,
- _lin0_in__0 = 1,
- _lin0_in__1 = 1,
- adv__1 = 1,
- x__0 = 1/2,
- max_norm_X = 1/2,
- dx__0 = 1/2]
+[_relu1_out__0 = 3, dx__1 = 1/2, _lin0_out__0 = 3,
+ adv__0 = 1, x__1 = 1/2, _lin0_in__0 = 1, _lin0_in__1 = 1,
+ adv__1 = 1, x__0 = 1/2, max_norm_X = 1/2, dx__0 = 1/2]
