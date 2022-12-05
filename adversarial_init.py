@@ -554,7 +554,7 @@ def save_MNIST_Model_DATA(name = "./MNIST2/"):
 
 if __name__ == '__main__':
     #simple_find_box_distance(2)
-    test_norm()
+    #test_norm()
     #simple_NN_ex()
     #save_MNIST_Model_DATA()
     #MNIST_example()
