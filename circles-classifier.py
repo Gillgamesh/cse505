@@ -115,7 +115,7 @@ class ConstrainedClassifier:
         y_min, y_max = self.X[:, 1].min()-0.1, self.X[:, 1].max()+0.1
 
         # Set grid spacing parameter
-        spacing = min(x_max - x_min, y_max - y_min) / 100
+        spacing = min(x_max - x_min, y_max - y_min) / 1000
 
         # Create grid
         XX, YY = np.meshgrid(np.arange(x_min, x_max, spacing),
@@ -154,8 +154,8 @@ class ConstrainedClassifier:
         # input and output
         self.nn_constraints, self.in_vars, self.out_vars = lantern.as_z3(self.net)
 
-        #print("Z3: NN constraints, input variables, output variables (Real-sorted):")
-        #print(nn_constraints)
+        print("Z3: NN constraints, input variables, output variables (Real-sorted):")
+        print(self.nn_constraints)
         print("Z3 Inputs:", self.in_vars)
         print("Z3 Outputs:", self.out_vars, end="\n\n")
 
@@ -167,9 +167,10 @@ class ConstrainedClassifier:
 
         # If a point in the in inner ring is classified as being in the outer ring,
         # then we have found a counterexample.
+
+        # Inner point predicted to be class 0 (outer circle)
         inner_point_classified_as_outer = And(
-                (in_pt_x * in_pt_x) + (in_pt_y * in_pt_y) <= 0.53,
-                # Inner point classified in outer donut.
+                (in_pt_x * in_pt_x) + (in_pt_y * in_pt_y) <= (0.75 * 0.75),
                 out_class <= 0.5,
         )
 
@@ -182,10 +183,10 @@ class ConstrainedClassifier:
 
         # If a point in the in outer ring is classified as being in the inner ring,
         # then we have found a counterexample.
+
+        # Outer point predicted to be class 1 (inner circle)
         outer_point_classified_as_inner = And(
-                # Define point outside inner donut
-                (in_pt_x * in_pt_x) + (in_pt_y * in_pt_y) >= 0.53,
-                # Outer point classified in inner donut.
+                (in_pt_x * in_pt_x) + (in_pt_y * in_pt_y) >= (0.75 * 0.75),
                 out_class >= 0.5,
         )
 
@@ -211,11 +212,7 @@ class ConstrainedClassifier:
             counterexample_coords = [eval(str(lin0_in_0_interp)),  eval(str(lin0_in_1_interp))]
             counterexample_class = relu3_out_0_interp
 
-            classification_0_or_1 = None
-            if eval(str(counterexample_class)) >= 0.5:
-                classification_0_or_1 = 1
-            else:
-                classification_0_or_1 = 0
+            classification_0_or_1 = round(eval(str(counterexample_class)))
 
             print("Z3 counterexample: ({}, {}) -> {}".format(counterexample_coords[0], counterexample_coords[1], classification_0_or_1))
 
