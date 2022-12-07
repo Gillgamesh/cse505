@@ -1,3 +1,4 @@
+from unittest.mock import DEFAULT
 from manim import *
 import manim
 import torch
@@ -39,7 +40,7 @@ class ApplyMatrixExample(manim.Scene):
             # manim.Vector([1,1]),
             # manim.Vector([-1,1]),
         )
-        violation_vector = manim.Vector([1, -3/10], color=manim.utils.color.PINK)
+        violation_vector = manim.Vector([-3/10, -1], color=manim.utils.color.PINK)
         # input_square = manim.Square()
         input_grid = manim.NumberPlane(
             x_length=2,
@@ -63,8 +64,8 @@ class ApplyMatrixExample(manim.Scene):
         )
         input_grid.prepare_for_nonlinear_transform()
         self.play(
-            manim.ApplyPointwiseFunction(sigmoid, input_grid),
-            manim.ApplyPointwiseFunction(sigmoid, violation_vector),
+            manim.ApplyPointwiseFunction(relu, input_grid),
+            manim.ApplyPointwiseFunction(relu, violation_vector),
         )
         self.play(
             manim.ApplyMatrix(matrix, input_grid),
@@ -115,10 +116,13 @@ def train_model(X, y, num_epochs=20):
 
 class NonlinearNoApproxExample(manim.ZoomedScene):
     def construct(self):
+        circle = manim.Circle(color=manim.utils.color.RED)
+        thinner_circle = manim.Circle(color=manim.utils.color.RED)
+        thinner_circle.set_stroke(width=1)
         self.add(
             manim.NumberPlane(),
+            circle
             # manim.Square(side_length=2*1.3, color=manim.utils.color.RED),
-            manim.Circle(color=manim.utils.color.RED)
             # manim.Vector([1,1]),
             # manim.Vector([-1,1]),
         )
@@ -131,14 +135,14 @@ class NonlinearNoApproxExample(manim.ZoomedScene):
             375887829275949276828963180752582952524793046740097912556650658071049565356526290125072559512401061289,
             0
         ]
-        violation_vector = manim.Vector(
+        violation_vector = manim.Point(
             violation_coords,
-            color=manim.utils.color.PINK
-        )
-        violation_vector2 = manim.Vector(
+            color=manim.utils.color.PINK,
+        ).set_stroke_width(10)
+        violation_vector2 = manim.Point(
             violation_coords,
-            color=manim.utils.color.RED
-        )
+            color=manim.utils.color.RED,
+        ).set_stroke_width(10)
         # input_square = manim.Square()
         input_grid = manim.NumberPlane(
             x_length=2,
@@ -171,14 +175,21 @@ class NonlinearNoApproxExample(manim.ZoomedScene):
                 x, y = np.array(model(torch.FloatTensor(points)[:2]))
                 return np.array([x,y,0])
         self.play(
-            manim.ApplyPointwiseFunction(weird_polar, input_grid),
             manim.ApplyPointwiseFunction(run_model, input_grid2 ),
-            manim.ApplyPointwiseFunction(weird_polar, violation_vector),
+            manim.ApplyPointwiseFunction(weird_polar, input_grid),
             manim.ApplyPointwiseFunction(run_model, violation_vector2),
+            manim.ApplyPointwiseFunction(weird_polar, violation_vector),
         )
         # wait and zoom in
         self.wait()
-        # self.play(self.camera.frame.animate.move_to(run_model(violation_coords)).set(width=(0.01)))
+        self.play(
+            self.camera.frame.animate.move_to(run_model(violation_coords)).set(width=(2)),
+            manim.ReplacementTransform(input_grid, input_grid.copy().set_stroke(width=1)),
+            manim.ReplacementTransform(input_grid2, input_grid2.copy().set_stroke(width=1)),
+            manim.ReplacementTransform(circle, thinner_circle),
+            manim.ReplacementTransform(violation_vector, violation_vector),
+            manim.ReplacementTransform(violation_vector2, violation_vector2)
+            )
         self.wait(1)
         
         # self.play(
